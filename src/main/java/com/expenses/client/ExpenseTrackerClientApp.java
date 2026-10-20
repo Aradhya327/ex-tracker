@@ -2,16 +2,15 @@ package com.expenses.client;
 
 import com.expenses.model.Expense;
 import com.expenses.model.Budget;
-import com.expenses.service.ExpenseService;
+import com.expenses.model.MonthlySummary;
 import com.expenses.util.ConsoleUtil;
-import com.expenses.util.JsonUtil;
 
-import java.io.File;
 import java.io.FileWriter;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Main console application for the Expense Tracker (Client Mode).
@@ -115,6 +114,19 @@ public class ExpenseTrackerClientApp {
         
         if (result != null) {
             ConsoleUtil.printSuccess("Expense added successfully! (ID: " + result.getId() + ")");
+
+            // Budget alerts are derived from the server-side totals
+            for (Budget budget : client.getBudgetsByMonth(YearMonth.from(date))) {
+                if (budget.getCategory() != category) continue;
+                if (budget.isOverBudget()) {
+                    ConsoleUtil.printWarning("Budget exceeded for " + category.getDisplayName()
+                            + "! Limit: ₹" + String.format("%.2f", budget.getLimitAmount())
+                            + ", Spent: ₹" + String.format("%.2f", budget.getSpentAmount()));
+                } else if (budget.isNearLimit()) {
+                    ConsoleUtil.printWarning("Near budget limit for " + category.getDisplayName()
+                            + " (" + String.format("%.1f", budget.getUsagePercentage()) + "%)");
+                }
+            }
         }
     }
 
@@ -144,7 +156,8 @@ public class ExpenseTrackerClientApp {
         }
         
         ConsoleUtil.printTable(headers, rows);
-        ConsoleUtil.printInfo("Total: " + expenses.size() + " expenses");
+        double total = expenses.stream().mapToDouble(Expense::getAmount).sum();
+        ConsoleUtil.printInfo("Total: ₹" + String.format("%.2f", total) + " (" + expenses.size() + " expenses)");
     }
 
     private void viewExpenseById() {
@@ -391,25 +404,92 @@ public class ExpenseTrackerClientApp {
     private void viewReports() {
         ConsoleUtil.printSubHeader("REPORTS");
         System.out.println("1. Monthly Summary");
-        System.out.println("2. Category Summary (Current Month)");
+        System.out.println("2. Category Summary");
+        System.out.println("3. Payment Method Summary");
         System.out.println("0. Back");
         
         int choice = ConsoleUtil.readInt("Enter choice: ");
         
         switch (choice) {
-            case 1 -> {
-                YearMonth month = ConsoleUtil.readMonth("Month", YearMonth.now());
-                // Note: This would need the MonthlySummary class from service
-                ConsoleUtil.printInfo("Monthly summary feature requires server-side MonthlySummary class");
-                ConsoleUtil.printInfo("Run in standalone mode for full reports");
-            }
-            case 2 -> {
-                YearMonth month = ConsoleUtil.readMonth("Month", YearMonth.now());
-                ConsoleUtil.printInfo("Category summary feature requires server-side implementation");
-            }
+            case 1 -> viewMonthlySummary();
+            case 2 -> viewCategorySummary();
+            case 3 -> viewPaymentMethodSummary();
             case 0 -> { return; }
             default -> ConsoleUtil.printError("Invalid choice");
         }
+    }
+
+    private void viewMonthlySummary() {
+        YearMonth month = ConsoleUtil.readMonth("Month", YearMonth.now());
+        MonthlySummary summary = client.getMonthlySummary(month);
+        if (summary == null) return;
+
+        ConsoleUtil.printSubHeader("MONTHLY SUMMARY - " + month);
+        ConsoleUtil.printInfo("Total Expenses: ₹" + String.format("%.2f", summary.getTotalExpenses()));
+        ConsoleUtil.printInfo("Number of Transactions: " + summary.getExpenseCount());
+
+        printBreakdown("By Category", "Category", summary.getByCategory(),
+                Expense.Category::getDisplayName, summary.getTotalExpenses());
+        printBreakdown("By Payment Method", "Payment Method", summary.getByPaymentMethod(),
+                Function.identity(), summary.getTotalExpenses());
+
+        if (!summary.getBudgets().isEmpty()) {
+            ConsoleUtil.printSubHeader("Budget Status");
+            for (Budget b : summary.getBudgets()) {
+                System.out.println(b);
+                if (b.isOverBudget()) {
+                    ConsoleUtil.printWarning("  >>> OVER BUDGET! <<<");
+                } else if (b.isNearLimit()) {
+                    ConsoleUtil.printWarning("  >>> Near limit (" + String.format("%.1f", b.getUsagePercentage()) + "%) <<<");
+                }
+            }
+        }
+    }
+
+    private void viewCategorySummary() {
+        YearMonth month = ConsoleUtil.readMonth("Month", YearMonth.now());
+        Map<Expense.Category, Double> summary = client.getCategorySummary(month);
+
+        ConsoleUtil.printSubHeader("CATEGORY SUMMARY - " + month);
+        if (summary.isEmpty()) {
+            ConsoleUtil.printInfo("No expenses for this month.");
+            return;
+        }
+        double total = summary.values().stream().mapToDouble(Double::doubleValue).sum();
+        printBreakdown("By Category", "Category", summary, Expense.Category::getDisplayName, total);
+        ConsoleUtil.printInfo("Total: ₹" + String.format("%.2f", total));
+    }
+
+    private void viewPaymentMethodSummary() {
+        YearMonth month = ConsoleUtil.readMonth("Month", YearMonth.now());
+        MonthlySummary summary = client.getMonthlySummary(month);
+        if (summary == null) return;
+
+        ConsoleUtil.printSubHeader("PAYMENT METHOD SUMMARY - " + month);
+        if (summary.getByPaymentMethod().isEmpty()) {
+            ConsoleUtil.printInfo("No expenses for this month.");
+            return;
+        }
+        printBreakdown("By Payment Method", "Payment Method", summary.getByPaymentMethod(),
+                Function.identity(), summary.getTotalExpenses());
+        ConsoleUtil.printInfo("Total: ₹" + String.format("%.2f", summary.getTotalExpenses()));
+    }
+
+    private <K> void printBreakdown(String title, String nameHeader, Map<K, Double> amounts,
+                                    Function<K, String> labels, double total) {
+        if (amounts.isEmpty()) return;
+
+        ConsoleUtil.printSubHeader(title);
+        String[] headers = {nameHeader, "Amount", "Percentage"};
+        String[][] rows = new String[amounts.size()][3];
+        int i = 0;
+        for (Map.Entry<K, Double> entry : amounts.entrySet()) {
+            rows[i][0] = labels.apply(entry.getKey());
+            rows[i][1] = String.format("₹%.2f", entry.getValue());
+            rows[i][2] = String.format("%.1f%%", total > 0 ? (entry.getValue() / total) * 100 : 0);
+            i++;
+        }
+        ConsoleUtil.printTable(headers, rows);
     }
 
     private void exportData() {

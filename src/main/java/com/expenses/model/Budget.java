@@ -1,11 +1,14 @@
 package com.expenses.model;
 
+import java.io.Serializable;
 import java.time.YearMonth;
 
 /**
  * Represents a budget limit for a category in a specific month.
  */
-public class Budget {
+public class Budget implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int id;
     private Expense.Category category;
     private YearMonth month;

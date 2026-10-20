@@ -32,6 +32,14 @@ public class ExpenseService {
     // ========== Expense Operations ==========
     
     public Expense addExpense(Expense expense) {
+        if (expense.getId() <= 0) {
+            // Client-supplied entries may not have an ID yet (or may reuse an ID
+            // from another client), so the service owns ID assignment.
+            expense.setId(++expenseIdCounter);
+        } else if (expense.getId() > expenseIdCounter) {
+            expenseIdCounter = expense.getId();
+            Expense.resetIdCounter(expenseIdCounter);
+        }
         expenses.put(expense.getId(), expense);
         saveExpenses();
         return expense;
@@ -95,35 +103,50 @@ public class ExpenseService {
     // ========== Budget Operations ==========
     
     public Budget addBudget(Budget budget) {
+        if (budget.getId() <= 0) {
+            budget.setId(++budgetIdCounter);
+        } else if (budget.getId() > budgetIdCounter) {
+            budgetIdCounter = budget.getId();
+        }
+        refreshBudgetSpent(budget);
         budgets.put(budget.getId(), budget);
         saveBudgets();
         return budget;
     }
 
     public Budget getBudget(int id) {
-        return budgets.get(id);
+        Budget budget = budgets.get(id);
+        refreshBudgetSpent(budget);
+        return budget;
     }
 
     public Budget getBudgetByCategoryAndMonth(Expense.Category category, YearMonth month) {
-        return budgets.values().stream()
+        Budget budget = budgets.values().stream()
                 .filter(b -> b.getCategory() == category && b.getMonth().equals(month))
                 .findFirst()
                 .orElse(null);
+        refreshBudgetSpent(budget);
+        return budget;
     }
 
     public List<Budget> getAllBudgets() {
-        return new ArrayList<>(budgets.values());
+        List<Budget> all = new ArrayList<>(budgets.values());
+        all.forEach(this::refreshBudgetSpent);
+        return all;
     }
 
     public List<Budget> getBudgetsByMonth(YearMonth month) {
-        return budgets.values().stream()
+        List<Budget> budgetsForMonth = budgets.values().stream()
                 .filter(b -> b.getMonth().equals(month))
                 .collect(Collectors.toList());
+        budgetsForMonth.forEach(this::refreshBudgetSpent);
+        return budgetsForMonth;
     }
 
     public Budget updateBudget(int id, Budget updatedBudget) {
         if (budgets.containsKey(id)) {
             updatedBudget.setId(id);
+            refreshBudgetSpent(updatedBudget);
             budgets.put(id, updatedBudget);
             saveBudgets();
             return updatedBudget;
@@ -191,6 +214,24 @@ public class ExpenseService {
 
     public String exportToJson() {
         return JsonUtil.toJson(getAllExpenses());
+    }
+
+    // ========== Budget tracking ==========
+
+    /**
+     * Recomputes the spent amount of a budget from the actual expenses for its
+     * category and month, so edits/deletes can never leave the total out of sync.
+     */
+    private void refreshBudgetSpent(Budget budget) {
+        if (budget == null || budget.getCategory() == null || budget.getMonth() == null) {
+            return;
+        }
+        double spent = expenses.values().stream()
+                .filter(e -> e.getCategory() == budget.getCategory())
+                .filter(e -> e.getDate() != null && YearMonth.from(e.getDate()).equals(budget.getMonth()))
+                .mapToDouble(Expense::getAmount)
+                .sum();
+        budget.setSpentAmount(spent);
     }
 
     // ========== Persistence ==========

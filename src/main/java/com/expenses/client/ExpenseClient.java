@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -76,6 +77,9 @@ public class ExpenseClient {
         try {
             output.writeObject(request);
             output.flush();
+            // Clear the handle cache so later requests always carry full object
+            // state instead of back-references to earlier payloads.
+            output.reset();
             return (Response) input.readObject();
         } catch (IOException | ClassNotFoundException e) {
             ConsoleUtil.printError("Communication error: " + e.getMessage());
@@ -232,6 +236,15 @@ public class ExpenseClient {
         }
         ConsoleUtil.printError(response.getMessage());
         return null;
+    }
+
+    public Map<Expense.Category, Double> getCategorySummary(YearMonth month) {
+        Response response = sendRequest(new Request(Request.Type.GET_CATEGORY_SUMMARY, month));
+        if (response.isSuccess()) {
+            return (Map<Expense.Category, Double>) response.getData();
+        }
+        ConsoleUtil.printError(response.getMessage());
+        return Map.of();
     }
 
     // ========== Export Operations ==========

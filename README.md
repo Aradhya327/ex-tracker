@@ -58,6 +58,20 @@ mvn clean package
 # - target/expense-tracker-1.0.0-jar-with-dependencies.jar (fat jar with all dependencies)
 ```
 
+### No Maven installed?
+The repo bundles Gson, so a JDK is enough:
+
+```bash
+# Linux/macOS
+./build.sh
+
+# Windows
+build.bat
+```
+
+This compiles the sources into `out/`. The `run.sh` / `run*.bat` launchers use the
+Maven fat JAR when it exists and otherwise fall back to `out/` automatically.
+
 ---
 
 ## 🏃 Running the Application

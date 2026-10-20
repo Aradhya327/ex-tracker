@@ -98,6 +98,11 @@ public class ExpenseServer {
                             Response response = handleRequest(request);
                             output.writeObject(response);
                             output.flush();
+                            // ObjectOutputStream caches every object it has written.
+                            // Without a reset, re-sending an updated Expense/Budget
+                            // would transmit a back-reference and the client would keep
+                            // deserializing its stale copy of the object.
+                            output.reset();
                         }
                     } catch (ClassNotFoundException e) {
                         System.err.println("[" + clientId + "] Invalid request format: " + e.getMessage());
@@ -126,6 +131,9 @@ public class ExpenseServer {
                     // Expense operations
                     case ADD_EXPENSE:
                         Expense newExpense = (Expense) request.getPayload();
+                        // The server is the single source of truth for IDs; a client's
+                        // local counter can collide with existing rows after a restart.
+                        newExpense.setId(0);
                         service.addExpense(newExpense);
                         return Response.success("Expense added successfully", newExpense);
 

@@ -104,11 +104,9 @@ public class ExpenseTrackerStandaloneApp {
         if (result != null) {
             ConsoleUtil.printSuccess("Expense added successfully! (ID: " + result.getId() + ")");
             
-            // Check budget
+            // Check budget (spent amount is derived from the stored expenses)
             Budget budget = service.getBudgetByCategoryAndMonth(category, YearMonth.from(date));
             if (budget != null) {
-                budget.addExpense(amount);
-                service.updateBudget(budget.getId(), budget);
                 if (budget.isOverBudget()) {
                     ConsoleUtil.printWarning("⚠ Budget exceeded for " + category.getDisplayName() + "! Limit: ₹" + budget.getLimitAmount() + ", Spent: ₹" + budget.getSpentAmount());
                 } else if (budget.isNearLimit()) {

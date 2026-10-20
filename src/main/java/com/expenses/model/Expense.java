@@ -1,12 +1,15 @@
 package com.expenses.model;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 /**
  * Represents a single expense entry.
  */
-public class Expense {
+public class Expense implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private static int idCounter = 0;
     private int id;
     private String title;
