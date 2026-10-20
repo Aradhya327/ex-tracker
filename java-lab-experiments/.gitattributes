@@ -1,0 +1,9 @@
+# Normalise line endings so the repo behaves the same on Windows and Linux
+* text=auto eol=lf
+
+# Binaries - never touch these
+*.jar binary
+*.war binary
+*.class binary
+*.png binary
+*.jpg binary

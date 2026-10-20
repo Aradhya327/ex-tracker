@@ -1,0 +1,29 @@
+# Compiled Java output
+*.class
+target/
+bin/
+out/
+
+# IDE metadata
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+
+# Build and deploy artefacts
+*.war
+*.jar
+!lib/*.jar
+
+# OS noise
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Local secrets - use .env or environment variables instead
+db.properties
+*.log
