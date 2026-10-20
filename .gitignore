@@ -1,0 +1,39 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+*.class
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Application data
+data/*.json
+!data/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Build
+out/
+build/
+dist/
+
+# Test reports
+target/surefire-reports/
+target/failsafe-reports/
