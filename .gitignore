@@ -5,6 +5,9 @@ target/
 *.ear
 *.class
 
+# Freebuff / agent metadata
+.freebuff/
+
 # IDE
 .idea/
 *.iml
